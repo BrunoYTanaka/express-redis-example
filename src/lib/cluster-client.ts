@@ -2,23 +2,23 @@ import dotenv from 'dotenv'
 dotenv.config({ path: '.env.dev' })
 
 import { cacheContexts } from '../constants/cache-contexts'
-import { Redis, RedisOptions } from 'ioredis'
+import { Cluster, ClusterNode, ClusterOptions } from 'ioredis'
 
-const cacheConfig: RedisOptions = {
-  host: process.env.REDIS_HOST,
-  port: Number(process.env.REDIS_PORT),
-  retryStrategy: (times) => {
+const clusterNodes: ClusterNode[] = [
+  {
+    host: process.env.REDIS_HOST,
+    port: Number(process.env.REDIS_PORT),
+  },
+]
+
+const clusterOptions: ClusterOptions = {
+  enableReadyCheck: true,
+  clusterRetryStrategy: (times) => {
     const delay = Math.min(times * 50, 2000)
     return delay
   },
-  maxRetriesPerRequest: 10,
-  reconnectOnError: (error) => {
-    const targetError = 'READONLY'
-    if (error.message.slice(0, targetError.length) === targetError) {
-      return true
-    }
-    return false
-  },
+  retryDelayOnFailover: 1000,
+  retryDelayOnTryAgain: 1000,
 }
 
 type ValueOf<T> = T[keyof T]
@@ -29,14 +29,14 @@ interface ISave<T> {
   expiresInSeconds: number
   context?: ValueOf<typeof cacheContexts>
 }
-class RedisClient {
-  public client: Redis
+class ClusterClient {
+  public client: Cluster
 
   constructor() {
-    this.client = new Redis(cacheConfig)
+    this.client = new Cluster(clusterNodes, clusterOptions)
 
     this.client.on('ready', () => {
-      console.log('\x1b[31m🚀 Connected to Redis Server \x1b[0m')
+      console.log('\x1b[35m🚀 Connected to Redis Cluster \x1b[0m')
     })
   }
 
@@ -67,7 +67,7 @@ class RedisClient {
   }
 
   async list<T>(): Promise<Array<{ key: string; value: T | null }>> {
-    const keys = await this.client.keys('*')
+    const keys = await this.scanKeysInCluster('*')
     const values = await Promise.all(
       keys.map(async (key: string) => {
         const value = await this.get<T>(key)
@@ -89,20 +89,40 @@ class RedisClient {
   }
 
   async flushAll(): Promise<void> {
-    await this.client.flushall()
+    const nodes = this.client.nodes('master')
+    await Promise.all(nodes.map((node) => node.flushall()))
   }
 
   async clearCacheByContext(
     context: ValueOf<typeof cacheContexts>,
   ): Promise<void> {
-    const keysToDelete = await this.client.keys(`${context}:*`)
+    const keysToDelete = await this.scanKeysInCluster(`${context}:*`)
 
     if (!keysToDelete || keysToDelete.length === 0) {
       return null
     }
 
-    await this.client.del(keysToDelete)
+    for (const key of keysToDelete) {
+      await this.client.del(key)
+    }
+  }
+
+  private async scanKeysInCluster(keyPattern: string): Promise<string[]> {
+    const keys = []
+
+    for (const node of this.client.nodes('master')) {
+      let cursor = '0'
+      do {
+        const reply = await node.scan(cursor, 'MATCH', keyPattern, 'COUNT', 150)
+        cursor = reply[0]
+        const foundKeys = reply[1]
+
+        keys.push(...foundKeys)
+      } while (cursor !== '0')
+    }
+
+    return keys
   }
 }
 
-export { RedisClient }
+export { ClusterClient }

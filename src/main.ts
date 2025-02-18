@@ -1,24 +1,19 @@
 import express, { Request, Response } from 'express'
 import { RedisClient } from './lib/redis-client'
+import { ClusterClient } from './lib/cluster-client'
 import { cacheContexts, CacheContexts } from './constants/cache-contexts'
 
 const app = express()
-const port = 3000
+const port = process.env.PORT ? Number(process.env.PORT) : 3000
 
 app.use(express.json())
 
-const cache = new RedisClient()
+const cache =
+  process.env.REDIS_CLUSTER === 'true' ? new ClusterClient() : new RedisClient()
 
 app.get('/', async (_req: Request, res: Response) => {
-  const keys = await cache.client.keys('*')
-  const values = await Promise.all(
-    keys.map(async (key: string) => {
-      const value = await cache.get(key)
-      return { key, value }
-    }),
-  )
-
-  res.status(200).send(values)
+  const values = await cache.list()
+  res.status(200).send({ total: values.length, values })
 })
 
 app.post('/create', async (req: Request, res: Response) => {
@@ -26,7 +21,7 @@ app.post('/create', async (req: Request, res: Response) => {
     key: String(new Date().getTime()),
     value: req.body,
     expiresInSeconds: 600,
-    context: cacheContexts.others,
+    context: cacheContexts.persons,
   })
 
   res.status(204).send('Created')
@@ -52,11 +47,13 @@ app.delete(
 )
 
 app.delete('/flushall', async (_req: Request, res: Response) => {
-  await cache.client.flushall()
+  await cache.flushAll()
 
   res.status(204).send('Flushed')
 })
 
 app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`)
+  console.log(
+    `\x1b[32m✅ Server is running on http://localhost:${port} \x1b[0m`,
+  )
 })
