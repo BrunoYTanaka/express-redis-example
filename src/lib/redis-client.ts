@@ -42,7 +42,7 @@ class RedisClient {
     this.client = new Redis(cacheConfig.redis)
   }
 
-  public async save<T>({
+  async save<T>({
     key,
     value,
     expiresInSeconds,
@@ -58,7 +58,7 @@ class RedisClient {
     )
   }
 
-  public async get(key: string): Promise<string | null> {
+  async get<T>(key: string): Promise<T | null> {
     const data = await this.client.get(key)
 
     if (!data) {
@@ -68,7 +68,7 @@ class RedisClient {
     return JSON.parse(data)
   }
 
-  public async delete(key: string): Promise<void> {
+  async delete(key: string): Promise<void> {
     const data = await this.client.get(key)
 
     if (!data) {
@@ -76,6 +76,22 @@ class RedisClient {
     }
 
     await this.client.del(key)
+  }
+
+  async flushAll(): Promise<void> {
+    await this.client.flushall()
+  }
+
+  async clearCacheByContext(
+    context: ValueOf<typeof cacheContexts>,
+  ): Promise<void> {
+    const keysToDelete = await this.client.keys(`${context}:*`)
+
+    if (!keysToDelete || keysToDelete.length === 0) {
+      return null
+    }
+
+    await this.client.del(keysToDelete)
   }
 }
 

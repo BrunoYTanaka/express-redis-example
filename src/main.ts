@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express'
-import { RedisClient } from './lib/redis-provider'
-import { cacheContexts } from './constants/cache-contexts'
+import { RedisClient } from './lib/redis-client'
+import { cacheContexts, CacheContexts } from './constants/cache-contexts'
 
 const app = express()
 const port = 3000
@@ -37,7 +37,7 @@ app.delete('/delete/:key', async (req: Request, res: Response) => {
 
   await cache.delete(key)
 
-  res.status(204).send('Deleted')
+  res.status(204).send('Key Deleted')
 })
 
 app.delete(
@@ -45,16 +45,9 @@ app.delete(
   async (req: Request, res: Response) => {
     const { cacheContext } = req.params
 
-    const keysToDelete = await cache.client.keys(`${cacheContext}:*`)
+    await cache.clearCacheByContext(cacheContext as CacheContexts)
 
-    if (!keysToDelete || keysToDelete.length === 0) {
-      res.status(404).send('Not Found')
-      return
-    }
-
-    await cache.client.del(keysToDelete)
-
-    res.status(204).send('Deleted')
+    res.status(204).send('Context Deleted')
   },
 )
 
