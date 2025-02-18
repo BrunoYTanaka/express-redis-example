@@ -1,0 +1,102 @@
+{
+	"info": {
+		"_postman_id": "3b83c8cc-b8bc-48e3-8fdd-af6150d1c717",
+		"name": "Redis",
+		"schema": "https://schema.getpostman.com/json/collection/v2.0.0/collection.json",
+		"_exporter_id": "8410853"
+	},
+	"item": [
+		{
+			"name": "Create",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"name\": \"Geralt\",\n    \"age\": 18\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": "{{Domain}}/create"
+			},
+			"response": []
+		},
+		{
+			"name": "List",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": "{{Domain}}/"
+			},
+			"response": []
+		},
+		{
+			"name": "Delete",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{Domain}}/delete/:key",
+					"host": [
+						"{{Domain}}"
+					],
+					"path": [
+						"delete",
+						":key"
+					],
+					"variable": [
+						{
+							"key": "key",
+							"value": "Geralt-1739883418828"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Flushall",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": "{{Domain}}/flushall"
+			},
+			"response": []
+		},
+		{
+			"name": "Delete all by context",
+			"request": {
+				"method": "DELETE",
+				"header": [],
+				"url": {
+					"raw": "{{Domain}}/delete/:cacheContext/all/clear",
+					"host": [
+						"{{Domain}}"
+					],
+					"path": [
+						"delete",
+						":cacheContext",
+						"all",
+						"clear"
+					],
+					"variable": [
+						{
+							"key": "cacheContext",
+							"value": "persons"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
