@@ -1,9 +1,9 @@
 // @ts-check
-import eslint from '@eslint/js';
-import vitest from '@vitest/eslint-plugin';
-import eslintConfigPrettier from 'eslint-config-prettier';
-import globals from 'globals';
-import tseslint from 'typescript-eslint';
+import eslint from '@eslint/js'
+import vitest from '@vitest/eslint-plugin'
+import eslintConfigPrettier from 'eslint-config-prettier'
+import globals from 'globals'
+import tseslint from 'typescript-eslint'
 
 // This is just an example default config for ESLint.
 // You should change it to your needs following the documentation.
@@ -48,7 +48,7 @@ export default tseslint.config(
     },
 
     rules: {
-      ...vitest.configs.recommended.rules,
+      ...(vitest.configs ? vitest.configs.recommended.rules : {}),
     },
 
     settings: {
@@ -59,8 +59,8 @@ export default tseslint.config(
 
     languageOptions: {
       globals: {
-        ...vitest.environments.env.globals,
+        ...(vitest.environments ? vitest.environments.env.globals : {}),
       },
     },
   },
-);
+)
