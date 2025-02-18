@@ -1,34 +1,69 @@
-/**
- * Some predefined delay values (in milliseconds).
- */
-export enum Delays {
-  Short = 500,
-  Medium = 2000,
-  Long = 5000,
-}
+import express, { Request, Response } from 'express'
+import { RedisClient } from './lib/redis-provider'
+import { cacheContexts } from './constants/cache-contexts'
 
-/**
- * Returns a Promise<string> that resolves after a given time.
- *
- * @param {string} name - A name.
- * @param {number=} [delay=Delays.Medium] - A number of milliseconds to delay resolution of the Promise.
- * @returns {Promise<string>}
- */
-function delayedHello(
-  name: string,
-  delay: number = Delays.Medium,
-): Promise<string> {
-  return new Promise((resolve: (value?: string) => void) =>
-    setTimeout(() => resolve(`Hello, ${name}`), delay),
-  );
-}
+const app = express()
+const port = 3000
 
-// Please see the comment in the .eslintrc.json file about the suppressed rule!
-// Below is an example of how to use ESLint errors suppression. You can read more
-// at https://eslint.org/docs/latest/user-guide/configuring/rules#disabling-rules
+app.use(express.json())
 
-// eslint-disable-next-line @typescript-eslint/explicit-function-return-type, @typescript-eslint/no-explicit-any
-export async function greeter(name: any) {
-  // The name parameter should be of type string. Any is used only to trigger the rule.
-  return await delayedHello(name, Delays.Long);
-}
+const cache = new RedisClient()
+
+app.get('/', async (_req: Request, res: Response) => {
+  const keys = await cache.client.keys('*')
+  const values = await Promise.all(
+    keys.map(async (key: string) => {
+      const value = await cache.get(key)
+      return { key, value }
+    }),
+  )
+
+  res.status(200).send(values)
+})
+
+app.post('/create', async (req: Request, res: Response) => {
+  await cache.save({
+    key: String(new Date().getTime()),
+    value: req.body,
+    expiresInSeconds: 600,
+    context: cacheContexts.others,
+  })
+
+  res.status(204).send('Created')
+})
+
+app.delete('/delete/:key', async (req: Request, res: Response) => {
+  const { key } = req.params
+
+  await cache.delete(key)
+
+  res.status(204).send('Deleted')
+})
+
+app.delete(
+  '/delete/:cacheContext/all/clear',
+  async (req: Request, res: Response) => {
+    const { cacheContext } = req.params
+
+    const keysToDelete = await cache.client.keys(`${cacheContext}:*`)
+
+    if (!keysToDelete || keysToDelete.length === 0) {
+      res.status(404).send('Not Found')
+      return
+    }
+
+    await cache.client.del(keysToDelete)
+
+    res.status(204).send('Deleted')
+  },
+)
+
+app.delete('/flushall', async (_req: Request, res: Response) => {
+  await cache.client.flushall()
+
+  res.status(204).send('Flushed')
+})
+
+app.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`)
+})
